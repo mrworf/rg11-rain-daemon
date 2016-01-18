@@ -1,0 +1,126 @@
+<html>
+  <head>
+    <title>RG11 Rain Daemon</title>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
+    <style type="text/css">
+      html {
+        font-family: "Helvetica Neue", "Helvetica", "Arial", "sans-serif";
+        font-size: 10pt;
+      }
+
+      div {
+        width: 49%;
+        float: left;
+        padding: 0.5%;
+      }
+
+      h1 {
+        margin: auto;
+        margin-bottom: 0px;
+        width: 50%;
+        text-align: center;
+      }
+
+      h2 {
+        margin: 0px;
+        padding: 0px;
+        border-bottom: 1px solid black;
+      }
+
+      #update {
+        float: none;
+        margin: auto;
+        width: 50%;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rain statistics</h1>
+    <div id="update">(updating)</div>
+    <div>
+      <h2>Last hour</h2>
+      <canvas id="hour" height="400" width="600"></canvas>
+    </div>
+    <div>
+      <h2>Last 24 hours</h2>
+      <canvas id="day" height="400" width="600"></canvas>
+    </div>
+    <div id="debug"></div>
+    <script type="text/javascript">
+      function loadData() {
+        // Get the data
+        var req = new XMLHttpRequest();
+        req.open("GET", "/", false);
+        req.send();
+
+        // Make it useful
+        var json = JSON.parse(req.responseText);
+        drawHour(json.hour, json.divider, "hour");
+        drawDay(json.day, json.divider, "day");
+        var when = new Date(json.current);
+        when = new Date(Date.UTC(when.getFullYear(), when.getMonth(), when.getDate(), when.getHours(), when.getMinutes()));
+        document.getElementById("update").innerHTML = when.toLocaleString();
+
+        // Auto refresh FTW!
+        setTimeout(loadData, 60000);
+      }
+
+      function drawDay(input, divider, element) {
+        var chart = {
+          labels : [],
+          datasets : [
+            {
+              label: "Inches",
+              fillColor      : "rgba(0, 0, 255, 0.5)",
+              strokeColor    : "rgba(0, 0, 255, 0.8)",
+              highlightFill  : "rgba(127, 127, 255, 0.5)",
+              highlightStroke: "rgba(127, 127, 255, 0.8)",
+              data : []
+            }
+          ]
+        };
+        for (var i = 0; i < input.length; ++i) {
+          chart.labels.push(-i);
+          chart.datasets[0].data.push(input[i] / divider);
+        }
+        var ctx = document.getElementById(element).getContext("2d");
+        window.days = new Chart(ctx).Bar(chart, {
+          responsive: true,
+          barValueSpacing : 1,
+          tooltipTemplate: '<%= value%>" <% if(label < -1){ %><%=Math.abs(label) %> hours ago<%}else if(label < 0){%> previous hour<%}else{%> this hour<%}%>',
+        });
+      }
+
+      function drawHour(input, divider, element) {
+        var chart = {
+          labels : [],
+          datasets : [
+            {
+              label: "Inches",
+              fillColor      : "rgba(0, 0, 255, 0.5)",
+              strokeColor    : "rgba(0, 0, 255, 0.8)",
+              pointColor     : "rgba(0, 0, 255, 1)",
+              pointStrokeColor: "rgba(127, 127, 255, 1)",
+              pointHighlightFill: "rgba(127, 127, 255, 1)",
+              pointHighlightStroke: "rgba(0, 0, 255, 0.8)",
+              data : []
+            }
+          ]
+        };
+        for (var i = 0; i < input.length; ++i) {
+          chart.labels.push("    ");
+          chart.datasets[0].data.push(input[i] / divider);
+        }
+        var ctx = document.getElementById(element).getContext("2d");
+        window.hours = new Chart(ctx).Line(chart, {
+          responsive: true,
+          pointDot : false,
+          showTooltips: false,
+        });
+      }
+
+      window.onload = loadData;
+    </script>
+  </body>
+</html>
