@@ -191,8 +191,13 @@ class rainCollector(threading.Thread):
           except sqlite3.OperationalError as e:
             print "ERROR: Unable to save bucket (typically happens if there is storage issues or time has rolled back)"
             print e
+        # Reset this bucket
+        self.buckets_1h[m] = 0
 
+      if lastval != v:
+        print "PIN has changed to %d" % v
       if lastval != v and lastval == 1: # Count on fall
+        print 'Rain! %f"' % (1/self.divider)
         self.buckets_1h[m] += 1
 
       # Summarize the last hour
@@ -208,6 +213,13 @@ class rainCollector(threading.Thread):
 
 # Create the REST interface
 app = Flask(__name__)
+
+@app.route("/present")
+def html_display():
+  result = ""
+  with open("present.html") as f:
+    result = f.read()
+  return result
 
 @app.route("/")
 def api_root():

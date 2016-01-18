@@ -43,7 +43,7 @@
       <canvas id="hour" height="400" width="600"></canvas>
     </div>
     <div>
-      <h2>Last 24 hours</h2>
+      <h2>Last 24 hours <span id="total"></span></h2>
       <canvas id="day" height="400" width="600"></canvas>
     </div>
     <div id="debug"></div>
@@ -63,7 +63,7 @@
         document.getElementById("update").innerHTML = when.toLocaleString();
 
         // Auto refresh FTW!
-        setTimeout(loadData, 60000);
+        //setTimeout(loadData, 60000);
       }
 
       function drawDay(input, divider, element) {
@@ -80,16 +80,22 @@
             }
           ]
         };
+        var total = 0;
         for (var i = 0; i < input.length; ++i) {
           chart.labels.push(-i);
           chart.datasets[0].data.push(input[i] / divider);
+          total += input[i];
         }
+        total /= divider;
+
         var ctx = document.getElementById(element).getContext("2d");
         window.days = new Chart(ctx).Bar(chart, {
           responsive: true,
           barValueSpacing : 1,
           tooltipTemplate: '<%= value%>" <% if(label < -1){ %><%=Math.abs(label) %> hours ago<%}else if(label < 0){%> previous hour<%}else{%> this hour<%}%>',
         });
+        if (total > 0)
+          document.getElementById("total").innerHTML = "(" + total + '" in total)';
       }
 
       function drawHour(input, divider, element) {
@@ -108,6 +114,12 @@
             }
           ]
         };
+        // We want to show accumulation, so... modify the data
+        var acc = input[59];
+        for (var i = 1; i < input.length; ++i) {
+          acc += input[59-i];
+          input[59-i] = acc;
+        }
         for (var i = 0; i < input.length; ++i) {
           chart.labels.push("    ");
           chart.datasets[0].data.push(input[i] / divider);
