@@ -9,7 +9,7 @@
       }
 
       div {
-        width: 49%;
+        width: 48%;
         float: left;
         padding: 0.5%;
       }
@@ -27,7 +27,7 @@
         border-bottom: 1px solid black;
       }
 
-      #update {
+      #update, #lastrain {
         float: none;
         margin: auto;
         width: 50%;
@@ -38,6 +38,7 @@
   <body>
     <h1>Rain statistics</h1>
     <div id="update">(updating)</div>
+    <div id="lastrain"></div>
     <div>
       <h2>Last hour</h2>
       <canvas id="hour" height="400" width="600"></canvas>
@@ -48,6 +49,22 @@
     </div>
     <div id="debug"></div>
     <script type="text/javascript">
+      function updateLastRain() {
+        // Get the data
+        var req = new XMLHttpRequest();
+        req.open("GET", "/lastrain", false);
+        req.send();
+
+        // Make it useful
+        var json = JSON.parse(req.responseText);
+        var res = "";
+        if (json.hasOwnProperty("timestamp")) {
+          var when = new Date(json.timestamp*1000);
+          res = "Last time it rained was " + when.toDateString() + ", " + when.getHours() + ":" + (when.getMinutes() < 10 ? "0" : "") + when.getMinutes();
+        }
+        document.getElementById("lastrain").innerHTML = res;
+      }
+
       function loadData() {
         // Get the data
         var req = new XMLHttpRequest();
@@ -64,6 +81,17 @@
 
         // Auto refresh FTW!
         //setTimeout(loadData, 60000);
+
+        //loadArchive();
+        updateLastRain();
+      }
+
+      function loadArchive() {
+        var req = new XMLHttpRequest();
+        req.open("GET", "/query/thismonth", false);
+        req.send();
+
+        var json = JSON.parse(req.responseText);
       }
 
       function drawDay(input, divider, element) {

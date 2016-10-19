@@ -22,7 +22,7 @@ import threading
 import argparse
 from array import array
 import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, abort
 import sqlite3
 
 class ChipGPIO:
@@ -91,7 +91,7 @@ class ChipGPIO:
 
 parser = argparse.ArgumentParser(description="RG-11 Rain Daemon - Keeping track of the wetness", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--logfile', metavar="FILE", help="Log to file instead of stdout")
-parser.add_argument('--port', default=80, type=int, help="Port to listen on")
+parser.add_argument('--port', default=8080, type=int, help="Port to listen on")
 parser.add_argument('--listen', metavar="ADDRESS", default="0.0.0.0", help="Address to listen on")
 parser.add_argument('--bucketsize', metavar="BUCKET", default=1, type=int, help='Size of the bucket (0 = 0.01", 1 = 0.001", 2 = 0.0001"')
 parser.add_argument('--database', metavar="DATABASE", default="rg11.db", help="Where to store rain data")
@@ -152,7 +152,7 @@ class rainCollector(threading.Thread):
         DIVIDER        INT     NOT NULL);''')
 
     gpio = ChipGPIO()
-    gpio.alloc(0, False)
+    gpio.alloc(1, False)
 
     lastval = 0
     t = self.getTime()
@@ -174,15 +174,14 @@ class rainCollector(threading.Thread):
       m = row[2]
       self.buckets_1d[m] = row[1]
 
-
     print "rainCollector running"
     while True:
+      ti = time.time()
       t = self.getTime()
       m = self.getMinute(t)
-      v = gpio.read(0)
+      v = gpio.read(1)
 
       if lastmin != m:
-        print "Another minute, another bucket"
         if self.buckets_1h[lastmin] > 0:
           try:
             db.execute('INSERT INTO RAIN (TS,AMOUNT,DIVIDER) VALUES (%d,%d,%d)' % (t-60,self.buckets_1h[lastmin],self.divider))
@@ -209,10 +208,67 @@ class rainCollector(threading.Thread):
       lastval = v
       lastmin = m
 
+      ti = time.time() - ti;
+      if ti > 0.025:
+        print "Time spent processing: %f ms" % ti
+      ti = time.time();
       time.sleep(0.025) # RG11 triggers for 50ms, so sleep half that so we don't miss it
+      ti = time.time() - ti
+      if ti > 0.049:
+        print "WARNING: Time elapsed during sleep 25ms was %f ms, might miss rain interrupt" % ti
 
 # Create the REST interface
 app = Flask(__name__)
+
+@app.route("/lastrain")
+def api_lastrain():
+  sql = '''SELECT ts FROM rain ORDER BY ts DESC LIMIT 1'''
+  msg = {"error" : "No rain recorded"}
+
+  db = sqlite3.connect(cmdline.database)
+  result = db.execute(sql)
+  for entry in result:
+    msg = {"timestamp": entry[0]}
+  json = jsonify(msg)
+  json.status_code = 200
+  db.close()    
+  return json
+
+@app.route("/archive/<type>")
+def api_archive(type):
+  sql = None
+
+  if type == "thismonth":
+    sql = '''SELECT STRFTIME("%d%H", DATETIME(ts, 'unixepoch')) AS dayhour, SUM(amount) AS rain 
+             FROM rain 
+             WHERE ts >= STRFTIME("%s", DATE('now', 'start of month'))
+             GROUP BY dayhour 
+             ORDER BY dayhour'''
+  elif type == "lastmonth":
+    sql = '''SELECT STRFTIME("%d%H", DATETIME(ts, 'unixepoch')) AS dayhour, SUM(amount) AS rain 
+             FROM rain 
+             WHERE ts >= STRFTIME("%s", DATE('now', 'start of month', '-1 month'))
+             GROUP BY dayhour 
+             ORDER BY dayhour'''
+  elif type == "thisyear":
+    sql = '''SELECT STRFTIME("%j", DATETIME(ts, 'unixepoch')) AS day, SUM(amount) AS rain 
+             FROM rain 
+             WHERE ts >= STRFTIME("%s", DATE('now', 'start of year'))
+             GROUP BY day
+             ORDER BY day'''
+
+  if sql is not None:
+    db = sqlite3.connect(cmdline.database)
+    result = db.execute(sql)
+    msg = {"divider" : raindivider, "entry" : {}}
+    for entry in result:
+      msg["entry"][entry[0]] = entry[1]
+    json = jsonify(msg)
+    json.status_code = 200
+    db.close()    
+    return json
+  else:
+    abort(404)
 
 @app.route("/present")
 def html_display():
