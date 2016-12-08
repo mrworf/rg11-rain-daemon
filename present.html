@@ -60,7 +60,10 @@
         var res = "";
         if (json.hasOwnProperty("timestamp")) {
           var when = new Date(json.timestamp*1000);
+          delta = (Date.now() - when.getTime()) / 86400000;
           res = "Last time it rained was " + when.toDateString() + ", " + when.getHours() + ":" + (when.getMinutes() < 10 ? "0" : "") + when.getMinutes();
+          if (delta >= 2)
+            res += " (approx " + Math.round(delta) + " days ago)";
         }
         document.getElementById("lastrain").innerHTML = res;
       }
@@ -123,7 +126,7 @@
           tooltipTemplate: '<%= value%>" <% if(label < -1){ %><%=Math.abs(label) %> hours ago<%}else if(label < 0){%> previous hour<%}else{%> this hour<%}%>',
         });
         if (total > 0)
-          document.getElementById("total").innerHTML = "(" + total + '" in total)';
+          document.getElementById("total").innerHTML = "(" + total + '" / ' + (total * 25.4).toFixed(2) + 'mm in total)';
       }
 
       function drawHour(input, divider, element) {
