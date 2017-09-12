@@ -60,10 +60,15 @@
         var res = "";
         if (json.hasOwnProperty("timestamp")) {
           var when = new Date(json.timestamp*1000);
-          delta = (Date.now() - when.getTime()) / 86400000;
-          res = "Last time it rained was " + when.toDateString() + ", " + when.getHours() + ":" + (when.getMinutes() < 10 ? "0" : "") + when.getMinutes();
-          if (delta >= 2)
-            res += " (approx " + Math.round(delta) + " days ago)";
+          delta1 = (Date.now() - when.getTime()) / 1000;
+          // Don't show this if it rained within the hour
+          if (delta1 >= (60*60)) {
+            delta2 = (Date.now() - when.getTime()) / 86400000;
+            res = "Last time it rained was " + when.toDateString() + ", " + when.getHours() + ":" + (when.getMinutes() < 10 ? "0" : "") + when.getMinutes();
+            if (delta2 >= 2)
+              res += " (approx " + Math.round(delta2) + " days ago)";
+
+          }
         }
         document.getElementById("lastrain").innerHTML = res;
       }
@@ -113,8 +118,8 @@
         };
         var total = 0;
         for (var i = 0; i < input.length; ++i) {
-          chart.labels.push(-i);
-          chart.datasets[0].data.push(input[i] / divider);
+          chart.labels.push(-23+i);
+          chart.datasets[0].data.push(input[input.length - i -1] / divider);
           total += input[i];
         }
         total /= divider;
@@ -153,7 +158,7 @@
         }
         for (var i = 0; i < input.length; ++i) {
           chart.labels.push("    ");
-          chart.datasets[0].data.push(input[i] / divider);
+          chart.datasets[0].data.push(input[input.length - i - 1] / divider);
         }
         var ctx = document.getElementById(element).getContext("2d");
         window.hours = new Chart(ctx).Line(chart, {
